@@ -1,4 +1,39 @@
-use std::ops::BitXorAssign;
+use std::io::Write; //write, writelnマクロを使うため
+
+struct Person {
+    name: String,
+    age: u32,
+}
+
+enum Emotion {
+    Anger,
+    Happy,
+}
+
+trait Emotional {
+    fn get_happy(&mut self) -> String;
+    fn get_anger(&mut self) -> String;
+    fn tell_state(&self) -> String;
+}
+
+struct HappyPerson {
+    name: String,
+    state: Emotion,
+}
+
+impl Emotional for HappyPerson {
+    fn get_anger(&mut self) -> String {
+        // この関数は呼ばれないので実装しないが、String型を返さなくても型検査を通過させる
+        unimplemented!()
+    }
+    fn get_happy(&mut self) -> String {
+        format!("{} is always happy", self.name)
+    }
+    fn tell_state(&self) -> String {
+        //この関数はあとで実装したいが、一旦String型を返さなくても型検査を通過させる
+        todo!()
+    }
+}
 
 fn main() {
     println!("Hello, world!");
@@ -20,11 +55,6 @@ fn main() {
     pub enum Option<T> {
         None,
         Some(T),
-    }
-
-    struct Person {
-        name: String,
-        age: u32,
     }
 
     let _p: Person = Person {
@@ -202,7 +232,53 @@ fn main() {
     for i in 0..v.len() {
         v[i] += 1;
     }
+
+    let x = add(1, 2);
+    println!("x = {}", x);
     
+    let p = Person {
+        name: String::from("Taro"),
+        age: 20,
+    };
+
+    p.say_name().say_age();
+
+    let s = format!("{}-{:?}", "Ab2", ("D", 5)); //s = String::form("Ab23(\"D\", 5)")と同じ
+    let s = format!("{}{}", "abc", "def"); //s = String::from("abcdef")と同じ
+    let s = concat!("A", "b2", 3); //s = String::from("Ab23")と同じ
+
+    print!("hello");
+    println!("hello {}", "world");
+    eprint!("hello {}", "error");
+    eprint!("hello");
+
+    let mut w = Vec::new(); //バイト列書き込み用のVecを宣言
+    write!(&mut w, "{}", "ABC"); //UTF-8バイト列で65, 66, 67
+    writeln!(&mut w, "is 123"); //UTF-8バイト列で32, 105, 115, 32, 49, 50, 51, 10
+    dbg!(w); //フォーマット文字列を受け取らない
+
+    panic!("it will be panic");
+    // thread 'main' panicked at 'it will be panic', src/main.rs:229:5
+
+    let v = vec![1, 2, 3];
+
+    println!("defined in file: {}", file!());
+    println!("defined in line: {}", line!());
+    println!("is test: {}", cfg!(unix));
+    println!("CARGO_HOME: {}", env!("CARGO_HOME"));
+
+    assert!(true);
+    assert_eq!(1, 1);
+    assert_ne!(1, 0);
+    debug_assert!(false);
+    debug_assert_eq!(1, 1);
+    debug_assert_ne!(1, 0);
+
+    let mut p = HappyPerson {
+        name: "Takashi".to_string(),
+        state: Emotion::Happy,
+    };
+    println!("{}", p.get_happy());
 }
 
 fn print(s: Box<[u8]>) {
@@ -225,5 +301,28 @@ impl Iterator for Iter {
         } else {
             None
         } 
+    }
+}
+
+fn add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+fn abs(number: i32) -> i32 {
+    if number < 0 {
+        return -number;
+    }
+    number
+}
+
+impl Person {
+    fn say_name(&self) -> &Self {
+        println!("I am {}.", self.name);
+        self
+    }
+
+    fn say_age(&self) -> &Self {
+        println!("I am {} years old.", self.age);
+        self
     }
 }
