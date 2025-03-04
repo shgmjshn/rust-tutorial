@@ -1,5 +1,68 @@
 use std::io::Write; //write, writelnマクロを使うため
 
+fn make_tuple<T, S>(t: T, s: S) -> (T, S) {
+    (t, s)
+}
+
+trait Tweet {
+    fn tweet(&self);
+    fn tweet_twice(&self) {
+        self.tweet();
+        self.tweet();
+    }
+
+    fn shout(&self) {
+        println!("Uooooooooooohhhh!!!!!!!!!");
+    }
+}
+
+struct Dove;
+struct Duck;
+
+impl Tweet for Dove {
+    fn tweet(&self) {
+        println!("Coo!");
+    }
+}
+
+impl Tweet for Duck {
+    fn tweet(&self) {
+        println!("Quack!");
+    }
+}
+
+struct Penguin {
+    name: &'static str,
+}
+
+
+
+//Eqを実装するために　PartialEqが必要
+#[derive(Eq, PartialEq)]
+struct A(i32);
+//PartialOrdを実装するためにpartialEqが必要
+#[derive(PartialEq, PartialOrd)]
+struct B(f32);
+//Copyを実装するためにCloneが必要
+#[derive(Copy, Clone)]
+struct C;
+#[derive(Clone)]
+struct D;
+#[derive(Debug)]
+struct E;
+#[derive(Default)]
+struct F;
+
+
+
+
+fn f(x: i32) -> &'static str {
+    match x {
+        n if n * n % 3 == 0 => "3n",
+        n if n * n % 3 == 1 => "3n+1 or 3n+2",
+        _ => unreachable!(), // コンパイラは上記条件で網羅していることを判定できない
+    }
+}
 struct Person {
     name: String,
     age: u32,
@@ -279,6 +342,44 @@ fn main() {
         state: Emotion::Happy,
     };
     println!("{}", p.get_happy());
+
+    // Aは一致比較可能
+    println!("{:?}", A(0) == A(1));
+
+    // Bは大小比較可能
+    println!("{:?}", B(1.0) > B(0.0));
+
+    // Cはムーブではなくコピーされる
+    let c0 = C;
+    let _c1 = c0;
+    let _c2 = c0; // Cがムーブならc0は_c1へムーブしているのでここでコンパイルエラー
+
+    // D　はclone可能
+    let d0 = D;
+    let _d1 = d0.clone();
+
+    // Eはデバッグプリント{:?}可能
+    println!("{:?}", E);
+
+    // Fはdefault可能
+    let _f = F::default();
+
+    let dove = Dove {};
+    dove.tweet();
+    dove.tweet_twice();
+    dove.shout();
+
+    let duck = Duck {};
+
+    let bird_vec: Vec<Box<dyn Tweet>> =vec![Box::new(dove), Box::new(duck)];
+    for bird in bird_vec {
+        bird.tweet();
+    }
+
+    let t1 = make_tuple(1, 2);
+    let t2 = make_tuple("Hello", "World!");
+    let t3 = make_tuple(vec![1, 2, 3], vec![4, 5]);
+    let t4 = make_tuple(3, "years old");
 }
 
 fn print(s: Box<[u8]>) {
