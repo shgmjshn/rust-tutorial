@@ -1,5 +1,13 @@
 use std::io::Write; //write, writelnマクロを使うため
 
+struct Droppable; 
+
+impl Drop for Droppable {
+    fn drop (&mut self) {
+        println!("Resource will be releaced!");
+    }
+}
+
 fn make_tuple<T, S>(t: T, s: S) -> (T, S) {
     (t, s)
 }
@@ -380,6 +388,60 @@ fn main() {
     let t2 = make_tuple("Hello", "World!");
     let t3 = make_tuple(vec![1, 2, 3], vec![4, 5]);
     let t4 = make_tuple(3, "years old");
+
+    let mut important_data = "Hello, World!".to_string();
+
+    important_data = calc_data(important_data); //値の所有権を渡し、返してもらう
+    println!("{}", important_data);
+
+    let important_data = "Hello,World!".to_string();
+    calc_data_ref(&important_data); //参照渡し
+    println!("{}", important_data);
+
+    let x = 5;
+    let y = &x;
+    let z = &x;
+    dbg!(x);
+    dbg!(y);
+    dbg!(z);
+
+    let mut x = 5;
+    {
+        let y = &mut x; // 1回目可変な参照渡し
+        let z = &mut x; // 2回目の可変な参照渡し（エラー）
+        dbg!(y);
+        dbg!(z);
+    }
+
+    {
+        let y = &x; // 1回目の不変な参照渡し
+        let z = &mut x; // 可変な参照渡し（エラー）
+        dbg!(y);
+        dbg!(z);
+    }
+
+    let y;
+    {
+        let x = 5; // xのライフタイム（始まり）
+        y = &x; // yのライフタイム（始まり）
+        dbg!(y); // xのライフタイム（終わり）
+    }
+    dbg!(y); // yのライフタイム（終わり）
+    // xよりもyが長く生存することはできない（エラー）
+
+    {
+        let d = Droppable;
+    }
+    println!("The Droppable should be releaced at the end of block.");
+}
+
+fn calc_data_ref(data: &String) {
+    println!("{}", data);
+}
+
+fn calc_data(data: String) -> String {
+    println!("{}", data);
+    data
 }
 
 fn print(s: Box<[u8]>) {
