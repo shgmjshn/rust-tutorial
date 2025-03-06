@@ -1,4 +1,6 @@
 use std::io::Write; //write, writelnマクロを使うため
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 struct Droppable; 
 
@@ -433,6 +435,30 @@ fn main() {
         let d = Droppable;
     }
     println!("The Droppable should be releaced at the end of block.");
+
+    let handle = thread::spawn(|| {
+        println!("Hello, world!");
+    });
+
+    dbg!(handle.join());
+
+    let mut handles = Vec::new();
+    let data = Arc::new(Mutex::new(vec![1; 10]));
+
+    for x in 0..10 {
+        let data_ref = data.clone();
+        handles.push(thread::spawn(move|| {
+            // lockを使ってdataへの可変参照を得る
+            let mut data = data_ref.lock().unwrap();
+            data[x] += 1;
+        }));
+    }
+
+    for handle in handles {
+        let _ =handle.join();
+    }
+
+    dbg!(data);
 }
 
 fn calc_data_ref(data: &String) {
