@@ -1,7 +1,124 @@
 use std::io::Write; //write, writelnマクロを使うため
+// futures というクレートに、非同期プログラムを実行するための基盤が用意されている
+// サンプルコードではそれを利用する
+// 'cargo add futures'で、手元に依存を追加できる
+use futures::{executor, future::join_all};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll};
 use std::thread;
 
+async fn some_great_function(arg: &i32) -> i32 {
+    *arg
+}
+
+// コンパイラは上述の'some_great_function'関数を下記のように展開する
+// ライフタイム'aを持ち、戻り値がFutureである下記の関数になる
+fn some_great_function_expanded<'a>(arg: &'a i32) -> impl Future<Output = i32> + 'a {
+    async move {
+        *arg
+    }
+}
+
+// 今回は説明の便宜のために、async fnを使用せず、impl Future<Output = i32>を手で書く
+fn some_great_function_example() -> impl Future<Output = i32> {
+    // asyncブロック内で値を作成する
+    async move {
+        let value: i32 = 5;
+        send_to_another_thread_with_borrowing(&value).await
+    }
+    // これでエラーは解消される
+}
+
+async fn send_to_another_thread_with_borrowing(x: &i32) -> i32 {
+    // 何か別スレッドへ送る処理がかかれている想定
+    *x
+}
+
+fn some_great_function_correct() -> impl Future<Output = i32> {
+    async {
+        let value: i32 = 5;
+        send_to_another_thread_with_borrowing(&value).await
+    }
+}
+
+fn move_to_async_block() -> impl Future<Output = ()> {
+    // 文字列を持つ変数を定義する。
+    let outside_variable = "this is outside".to_string();
+    // 通常ならここでoutside_variableの所有権がなくなるので、コンパイルは通らないが、
+    async move {
+        // moveキーワードを用いたことにより、変数の所有権をasyncブロックの中に移動し、ブロック内でも使用できるようにした
+        println!("{}", outside_variable);
+    }
+}
+
+async fn print_async(value: i32) {
+    println!("{}", value);
+}
+
+async fn calculate() -> i32 {
+    let add1 = async_add(2,3).await;
+    // 出力されない
+    // 正しく書き直すならば、print_async(add1).await; となる
+    print_async(add1);
+    let add2 = async_add(3, 4).await;
+    //　これも出力されない
+    // 正しく書き直すならばprint_async(add2).await:となる
+    print_async(add2);
+    let result = async_add(add1, add2).await;
+    result
+}
+
+async fn async_add(left: i32, right: i32) -> i32 {
+    left + right
+}
+
+async fn something_great_async_function() -> i32 {
+    let ans1 = async_add(2, 3).await; // この時点で5という値を取り出せる
+    let ans2 = async_add(3, 4).await; // この時点で７という値を取り出せる
+    let ans3 = async_add(4, 5).await; // この時点で９という値を取り出せる
+    let result = ans1 + ans2 + ans3;
+    result // 結果は、５＋７＋９＝２１
+}
+
+struct CountDown(u32);
+
+impl Future for CountDown {
+    type Output = String;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<String> {
+        if self.0 == 0 {
+            Poll::Ready("Zero!!!".to_string())
+        } else {
+            println!("{}", self.0);
+            self.0 -= 1;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    }
+}
+
+struct User {
+    // 何かデータを持っている
+}
+
+struct UserId(u32);
+
+struct Db{}
+
+impl Db {
+    async fn find_by_user_id(&self, user_id: UserId) -> Option<User> {
+        // DBに接続するなどの実装が追加される想定
+        Some(User {})  // ダミーのUserを返す
+    }
+}
+
+async fn find_user_by_id(db: &Db, user_id: UserId) -> Option<User> {
+    // db はデータベースを示す。Option＜User＞型を返すものとする
+    db.find_by_user_id(user_id).await
+}
 struct Droppable; 
 
 impl Drop for Droppable {
@@ -459,6 +576,64 @@ fn main() {
     }
 
     dbg!(data);
+
+    let (tx, rx) = mpsc::channel();
+    let handle = thread::spawn(move || {
+        let data = rx.recv().unwrap();
+        println!("{}", data);
+    });
+
+    let _ = tx.send("Hello, world!");
+    let _ = handle.join();
+
+    let mut handles = Vec::new();
+    let mut data = vec![1; 10];
+    let mut snd_channels = Vec::new();
+    let mut rcv_channels = Vec::new();
+
+    for _ in 0..10 {
+        // mainから各スレッドへのチャンネル
+        let (snd_tx, snd_rx) = mpsc::channel();
+        // 各スレッドからmainへのチャンネル
+        let (rcv_tx, rcv_rx) = mpsc::channel();
+        snd_channels.push(snd_tx);
+        rcv_channels.push(rcv_rx);
+
+        handles.push(thread::spawn(move || {
+            let mut data = snd_rx.recv().unwrap();
+            data += 1;
+            let _ = rcv_tx.send(data);
+        }));
+    }
+
+    // 各スレッドにdataの値を送信
+    for x in 0..10 {
+        let _ = snd_channels[x].send(data[x]);
+    }
+
+    // 各スレッドからの結果をdataに格納
+    for x in 0..10 {
+        data[x] = rcv_channels[x].recv().unwrap();
+    }
+
+    for handle in handles {
+        let _ = handle.join();
+    }
+
+    dbg!(data);
+
+    // find_user_by_id関数を実行する
+    executor::block_on(find_user_by_id(&Db {}, UserId(1)));
+
+    let countdown_future1 = CountDown(10);
+    let countdown_future2 = CountDown(20);
+    let cd_set = join_all(vec![countdown_future1,countdown_future2]);
+    let res = executor::block_on(cd_set);
+    for (i, s) in res.into_iter().enumerate() {
+        println!("{}: {}", i, s);
+    }
+
+    executor::block_on(something_great_async_function());
 }
 
 fn calc_data_ref(data: &String) {
